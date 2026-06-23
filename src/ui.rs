@@ -30,6 +30,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     if matches!(app.mode, Mode::Help) {
         draw_help(frame, frame.area());
+    } else if matches!(app.mode, Mode::Discover) {
+        draw_discover(frame, frame.area(), app);
     }
 }
 
@@ -39,6 +41,13 @@ fn draw_sources(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, s)| {
+            let (prefix, prefix_color) = if app.source_items_loading[i] {
+                ("\u{21BB} ", Color::Yellow)
+            } else if app.source_items_loaded[i] {
+                ("\u{2713} ", Color::Green)
+            } else {
+                ("  ", Color::DarkGray)
+            };
             let style = if i == app.selected_source {
                 Style::default()
                     .fg(Color::Yellow)
@@ -46,7 +55,10 @@ fn draw_sources(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 Style::default()
             };
-            ListItem::new(Line::from(Span::styled(&s.name, style)))
+            ListItem::new(Line::from(vec![
+                Span::styled(prefix, Style::default().fg(prefix_color)),
+                Span::styled(&s.name, style),
+            ]))
         })
         .collect();
 
@@ -186,7 +198,7 @@ fn draw_content(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
     let [search_area, status_area] =
-        Layout::horizontal([Constraint::Fill(1), Constraint::Length(30)]).areas(area);
+        Layout::horizontal([Constraint::Fill(1), Constraint::Length(50)]).areas(area);
 
     let search_text = if matches!(app.mode, Mode::Searching) {
         format!(" Search: {}█", app.search_input)
@@ -212,7 +224,7 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
     );
 
     let status_text = format!(
-        " {} items | ? help | q quit ",
+        " {} items | thanks to Kapeli, Dash & GitHub ",
         app.filtered_items.len()
     );
     let status_block = Block::default()
@@ -234,9 +246,11 @@ fn draw_help(frame: &mut Frame, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::raw(" h / l / ← →        - Change focus")),
-        Line::from(Span::raw(" j / k / ↓ / ↑       - Move down/up")),
+        Line::from(Span::raw(" Tab / Ctrl+w / ← →  - Switch panel")),
+        Line::from(Span::raw(" j / k / ↓ / ↑        - Move down / up")),
         Line::from(Span::raw(" Enter              - Open item / load doc")),
+        Line::from(Span::raw(" d                  - Download selected source")),
+        Line::from(Span::raw(" a                  - Add source from catalog")),
         Line::from(Span::raw(" / or Ctrl+f        - Start search")),
         Line::from(Span::raw(" Esc                - Exit search / go back")),
         Line::from(Span::raw(" o                  - Open doc in vim")),
@@ -260,6 +274,68 @@ fn draw_help(frame: &mut Frame, area: Rect) {
 
     let popup_area = centered_rect(area, 50, 50);
     frame.render_widget(paragraph, popup_area);
+}
+
+fn draw_discover(frame: &mut Frame, area: Rect, app: &App) {
+    let items: Vec<ListItem> = app
+        .discover_sources
+        .iter()
+        .enumerate()
+        .map(|(i, sc)| {
+            let style = if i == app.discover_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            let exists = app.sources.iter().any(|s| s.url == sc.url);
+            let prefix = if exists { "✓ " } else { "  " };
+            ListItem::new(Line::from(vec![
+                Span::styled(prefix, Style::default().fg(if exists { Color::Green } else { Color::DarkGray })),
+                Span::styled(&sc.name, style),
+            ]))
+        })
+        .collect();
+
+    let popup_area = centered_rect(area, 60, 70);
+
+    let list = List::new(items).highlight_style(Style::default());
+    let count = app.discover_sources.len();
+
+    let para = Paragraph::new(Text::from(vec![
+        Line::from(Span::styled(
+            " Catalog of documentation sources ",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            " Inspired by Kapeli/Dash & community docsets ",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+    ]));
+
+    let outer_block = Block::default()
+        .title(format!(" Add Source ({} available, {} added) ", count, app.sources.len()))
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Cyan));
+
+    let inner = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .split(popup_area);
+
+    frame.render_widget(outer_block, popup_area);
+    frame.render_widget(para, inner[0]);
+    frame.render_widget(list, inner[1]);
+
+    let hint = Line::from(Span::styled(
+        " Enter: add  |  Esc/q/a: close ",
+        Style::default().fg(Color::DarkGray),
+    ));
+    frame.render_widget(Paragraph::new(hint), inner[2]);
 }
 
 fn centered_rect(area: Rect, percent_x: u16, percent_y: u16) -> Rect {

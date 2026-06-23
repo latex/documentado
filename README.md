@@ -1,6 +1,6 @@
 # documentado
 
-> A TUI documentation browser for Rust — search, navigate, and open docs right from your terminal.
+> A TUI documentation browser inspired by Dash — search, browse, and cache docs from your terminal.
 
 ![demo](https://img.shields.io/badge/status-alpha-yellow)
 ![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange)
@@ -12,7 +12,9 @@ Inspired by [Dash](https://kapeli.com/dash) / [Zeal](https://zealdocs.org/) with
 
 - **Three-panel layout** — Sources | Items | Documentation for fast browsing
 - **Fuzzy search** — powered by [nucleo](https://github.com/helix-editor/nucleo)
-- **Async fetching** — loads documentation from `doc.rust-lang.org` without freezing the UI
+- **Offline cache** — SQLite-backed local cache; first fetch is saved, subsequent opens are instant
+- **Configurable sources** — JSON config file; add any documentation website
+- **Source catalog** — 48+ curated docsets (Python, React, Go, Docker, etc.) inspired by Dash
 - **Vim integration** — `o` opens the current doc in your `$EDITOR`; Vim plugin included
 - **CLI-driven** — pass a search term as argument to jump straight to results
 
@@ -34,23 +36,79 @@ Download the latest release from [Releases](https://github.com/latex/documentado
 # Open the browser
 documentado
 
+# Download a source: navigate with j/k, press d
+# Browse items: press Enter, select with j/k, Enter again to view
+# Add more sources: press a to open the catalog
+
 # Search for something right away
 documentado Vec
-documentado "Option"
+documentado "HashMap"
 ```
 
 ### Keybindings
 
 | Key | Action |
 |------|--------|
-| `h` / `l` | Move focus between panels |
+| `h` / `l` / `Tab` | Move focus between panels |
 | `j` / `k` | Navigate up / down |
-| `Enter` | Open item / load docs |
+| `Enter` | Open item / load docs / switch to items |
+| `d` | Download / refresh selected source |
+| `a` | Add source from curated catalog |
 | `/` or `Ctrl+f` | Start search |
-| `Esc` | Exit search / clear filter |
+| `Esc` | Exit search / go back |
 | `o` | Open doc in editor |
+| `g` / `G` | Go to top / bottom |
 | `?` | Toggle help overlay |
-| `q` | Quit |
+| `q` / `Ctrl+c` | Quit |
+
+### Source indicators
+
+| Indicator | Meaning |
+|-----------|---------|
+| _(empty)_ | Not downloaded yet |
+| `↻` | Downloading... |
+| `✓` | Cached locally |
+
+## Cache
+
+Documentation is cached locally in SQLite at:
+- **Windows:** `%LOCALAPPDATA%\com.documentado\documentado\cache\cache.db`
+- **Linux:** `~/.cache/com.documentado/documentado/cache.db`
+- **macOS:** `~/Library/Caches/com.documentado/documentado/cache.db`
+
+Press `d` again on a cached source to refresh.
+
+## Configuration
+
+Sources are defined in a JSON config file at:
+- **Windows:** `%APPDATA%\com.documentado\documentado\config\config.json`
+- **Linux:** `~/.config/com.documentado/documentado/config.json`
+- **macOS:** `~/Library/Application Support/com.documentado/documentado/config.json`
+
+```json
+{
+  "sources": [
+    {
+      "name": "Rust Standard Library",
+      "url": "https://doc.rust-lang.org/stable/std",
+      "type": "rust-std"
+    },
+    {
+      "name": "My Internal Docs",
+      "url": "https://docs.mycompany.com",
+      "type": "generic"
+    }
+  ]
+}
+```
+
+### Source types
+
+| Type | Description |
+|------|-------------|
+| `rust-std` | Rust Standard Library (custom CSS selector parsing) |
+| `neovim` | Neovim User Manual (custom `.help-li` parsing) |
+| `generic` | Any documentation site (scrapes all index page links) |
 
 ## Vim Integration
 
@@ -81,16 +139,8 @@ Plug 'latex/documentado', { 'rtp': '.' }
 |-------------------|-------------|
 | `:Documentado` | Open browser |
 | `:Documentado HashMap` | Search for "HashMap" |
-| `<leader>d` (normal) | Search word under cursor |
-| `<leader>d` (visual) | Search selected text |
-
-## Configuration
-
-Set the path to the binary if it's not in your `PATH`:
-
-```vim
-let g:documentado_bin = 'C:\tools\documentado.exe'
-```
+| `<leader>do` (normal) | Search word under cursor |
+| `<leader>do` (visual) | Search selected text |
 
 ## Build from source
 
@@ -107,6 +157,17 @@ On Windows with MSVC:
 # Use Visual Studio Build Tools or Visual Studio Developer PowerShell
 cargo build --release
 ```
+
+## Credits
+
+- **[Kapeli / Dash](https://kapeli.com/dash)** — Inspiration and original docset ecosystem
+- **[Kapeli/feeds](https://github.com/Kapeli/feeds)** — Official Dash docset feeds
+- **[Kapeli/Dash-User-Contributions](https://github.com/Kapeli/Dash-User-Contributions)** — Community-contributed docsets
+- **[hashhar/dash-contrib-docset-feeds](https://github.com/hashhar/dash-contrib-docset-feeds)** — Zeal-compatible XML feeds
+- **[zealdocs/zeal](https://zealdocs.org/)** — Linux/Windows Dash alternative
+- **[ratatui](https://github.com/ratatui/ratatui)** — TUI framework
+- **[nucleo](https://github.com/helix-editor/nucleo)** — Fuzzy matching
+- All documentation authors and open-source maintainers
 
 ## License
 
