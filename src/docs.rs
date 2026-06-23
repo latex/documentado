@@ -5,6 +5,7 @@ use scraper::{Html, Selector};
 pub struct DocSource {
     pub name: String,
     pub url: String,
+    pub source_type: String,
     pub items: Vec<DocItem>,
 }
 
@@ -22,29 +23,15 @@ pub enum DocContent {
     Loaded(String),
 }
 
-pub const STD_URL: &str = "https://doc.rust-lang.org/stable/std";
-pub const NEOVIM_URL: &str = "https://neovim.io/doc/user";
-
-pub fn default_sources() -> Vec<DocSource> {
-    vec![
-        DocSource {
-            name: "Rust Standard Library".into(),
-            url: STD_URL.to_string(),
-            items: Vec::new(),
-        },
-        DocSource {
-            name: "Neovim User Manual".into(),
-            url: NEOVIM_URL.to_string(),
-            items: Vec::new(),
-        },
-    ]
+pub async fn fetch_module_items(source_url: &str, source_type: &str) -> Result<Vec<DocItem>> {
+    match source_type {
+        "neovim" => fetch_nvim_items().await,
+        "rust-std" => fetch_rust_items(source_url).await,
+        _ => fetch_generic_items(source_url).await,
+    }
 }
 
-pub async fn fetch_module_items(source_url: &str) -> Result<Vec<DocItem>> {
-    if source_url == NEOVIM_URL {
-        return fetch_nvim_items().await;
-    }
-
+async fn fetch_rust_items(source_url: &str) -> Result<Vec<DocItem>> {
     let url = format!("{}/index.html", source_url);
     let html = reqwest::get(&url).await?.text().await?;
     let document = Html::parse_document(&html);
@@ -90,7 +77,7 @@ pub async fn fetch_module_items(source_url: &str) -> Result<Vec<DocItem>> {
 }
 
 async fn fetch_nvim_items() -> Result<Vec<DocItem>> {
-    let html = reqwest::get(NEOVIM_URL).await?.text().await?;
+    let html = reqwest::get("https://neovim.io/doc/user").await?.text().await?;
     let document = Html::parse_document(&html);
     let mut items = Vec::new();
 
@@ -112,6 +99,45 @@ async fn fetch_nvim_items() -> Result<Vec<DocItem>> {
     }
 
     Ok(items)
+}
+
+async fn fetch_generic_items(source_url: &str) -> Result<Vec<DocItem>> {
+    let url = format!("{}/index.html", source_url);
+    let html = reqwest::get(&url).await?.text().await?;
+    let document = Html::parse_document(&html);
+    let mut items = Vec::new();
+
+    let link_sel = Selector::parse("a[href]").unwrap();
+
+    for link in document.select(&link_sel) {
+        if let Some(href) = link.value().attr("href") {
+            if href.starts_with("http") || href.starts_with('#') || href.starts_with("javascript:") {
+                continue;
+            }
+            let name = link.text().collect::<String>().trim().to_string();
+            if name.is_empty() || name.len() < 2 {
+                continue;
+            }
+            let full_url = resolve_url(source_url, href);
+            items.push(DocItem {
+                name,
+                item_type: "page".into(),
+                url: full_url,
+            });
+        }
+    }
+
+    Ok(items)
+}
+
+fn resolve_url(base: &str, href: &str) -> String {
+    let base = base.trim_end_matches('/');
+    if href.starts_with('/') {
+        let domain_end = base[8..].find('/').map(|i| i + 8).unwrap_or(base.len());
+        format!("{}{}", &base[..domain_end], href)
+    } else {
+        format!("{}/{}", base, href)
+    }
 }
 
 pub async fn fetch_item_content(url: &str) -> Result<String> {

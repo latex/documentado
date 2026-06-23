@@ -1,9 +1,13 @@
+use std::sync::{Arc, Mutex};
+
 use anyhow::Result;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io;
 
 mod app;
+mod cache;
+mod config;
 mod docs;
 mod ui;
 
@@ -16,6 +20,8 @@ async fn main() -> Result<()> {
     }));
 
     let query = std::env::args().nth(1).unwrap_or_default();
+    let cache = Arc::new(Mutex::new(cache::Cache::new()?));
+    let cfg = config::Config::load()?;
 
     crossterm::terminal::enable_raw_mode()?;
     let mut stderr = io::stderr();
@@ -23,7 +29,7 @@ async fn main() -> Result<()> {
     let backend = CrosstermBackend::new(stderr);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = app::App::new(query)?;
+    let mut app = app::App::new(query, cache, cfg.sources)?;
     let res = app.run(&mut terminal).await;
 
     restore_terminal()?;
