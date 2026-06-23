@@ -175,6 +175,9 @@ impl App {
             KeyCode::Char('q') | KeyCode::Char('Q') => {
                 std::process::exit(0);
             }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                std::process::exit(0);
+            }
             KeyCode::Char('?') => {
                 self.mode = Mode::Help;
             }
@@ -184,12 +187,54 @@ impl App {
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.mode = Mode::Searching;
             }
-            KeyCode::Tab => {
+            KeyCode::Tab | KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.focus = match self.focus {
                     Focus::Sources => Focus::Items,
                     Focus::Items => Focus::Content,
                     Focus::Content => Focus::Sources,
                 };
+            }
+            KeyCode::Char('1') => self.focus = Focus::Sources,
+            KeyCode::Char('2') => self.focus = Focus::Items,
+            KeyCode::Char('3') => self.focus = Focus::Content,
+            KeyCode::Char('g') => match self.focus {
+                Focus::Sources => {
+                    self.selected_source = 0;
+                    self.request_module_items(0);
+                    if self.source_items_loaded[0] {
+                        self.apply_filter();
+                    } else {
+                        self.filtered_items.clear();
+                        self.doc_content = None;
+                    }
+                }
+                Focus::Items => self.selected_item = 0,
+                Focus::Content => self.content_scroll = 0,
+            },
+            KeyCode::Char('G') => match self.focus {
+                Focus::Sources => {
+                    let last = self.sources.len().saturating_sub(1);
+                    self.selected_source = last;
+                    self.request_module_items(last);
+                    if self.source_items_loaded[last] {
+                        self.apply_filter();
+                    } else {
+                        self.filtered_items.clear();
+                        self.doc_content = None;
+                    }
+                }
+                Focus::Items => self.selected_item = self.filtered_items.len().saturating_sub(1),
+                Focus::Content => self.content_scroll = usize::MAX,
+            },
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.focus == Focus::Content {
+                    self.content_scroll = self.content_scroll.saturating_sub(10);
+                }
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.focus == Focus::Content {
+                    self.content_scroll = self.content_scroll.saturating_add(10);
+                }
             }
             KeyCode::Char('h') | KeyCode::Left => {
                 self.focus = match self.focus {
