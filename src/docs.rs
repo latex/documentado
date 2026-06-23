@@ -23,16 +23,28 @@ pub enum DocContent {
 }
 
 pub const STD_URL: &str = "https://doc.rust-lang.org/stable/std";
+pub const NEOVIM_URL: &str = "https://neovim.io/doc/user";
 
 pub fn default_sources() -> Vec<DocSource> {
-    vec![DocSource {
-        name: "Rust Standard Library".into(),
-        url: STD_URL.to_string(),
-        items: Vec::new(),
-    }]
+    vec![
+        DocSource {
+            name: "Rust Standard Library".into(),
+            url: STD_URL.to_string(),
+            items: Vec::new(),
+        },
+        DocSource {
+            name: "Neovim User Manual".into(),
+            url: NEOVIM_URL.to_string(),
+            items: Vec::new(),
+        },
+    ]
 }
 
 pub async fn fetch_module_items(source_url: &str) -> Result<Vec<DocItem>> {
+    if source_url == NEOVIM_URL {
+        return fetch_nvim_items().await;
+    }
+
     let url = format!("{}/index.html", source_url);
     let html = reqwest::get(&url).await?.text().await?;
     let document = Html::parse_document(&html);
@@ -77,12 +89,37 @@ pub async fn fetch_module_items(source_url: &str) -> Result<Vec<DocItem>> {
     Ok(items)
 }
 
+async fn fetch_nvim_items() -> Result<Vec<DocItem>> {
+    let html = reqwest::get(NEOVIM_URL).await?.text().await?;
+    let document = Html::parse_document(&html);
+    let mut items = Vec::new();
+
+    let help_sel = Selector::parse(".help-li a").unwrap();
+
+    for link in document.select(&help_sel) {
+        if let Some(href) = link.value().attr("href") {
+            let name = link.text().collect::<String>().trim().to_string();
+            if name.is_empty() {
+                continue;
+            }
+            let full_url = format!("https://neovim.io{}", href);
+            items.push(DocItem {
+                name,
+                item_type: "help".into(),
+                url: full_url,
+            });
+        }
+    }
+
+    Ok(items)
+}
+
 pub async fn fetch_item_content(url: &str) -> Result<String> {
     let html = reqwest::get(url).await?.text().await?;
     let document = Html::parse_document(&html);
     let mut text = String::new();
 
-    let content_sel = Selector::parse(".docblock, #main-content, main, #content").unwrap();
+    let content_sel = Selector::parse(".docblock, #main-content, main, #content, .col-wide").unwrap();
     if let Some(content) = document.select(&content_sel).next() {
         extract_text(&content, &mut text, 0);
     }
