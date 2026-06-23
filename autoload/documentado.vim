@@ -12,12 +12,10 @@ function! documentado#search(query) abort
   endif
 endfunction
 
-let s:doc_win = -1
-
 function! documentado#nvim_open(query) abort
-  let l:cmd = g:documentado_bin
+  let l:args = [g:documentado_bin]
   if !empty(a:query)
-    let l:cmd = l:cmd . ' ' . shellescape(a:query)
+    call add(l:args, a:query)
   endif
 
   let l:buf = nvim_create_buf(v:false, v:true)
@@ -32,14 +30,8 @@ function! documentado#nvim_open(query) abort
         \ 'title': ' Documentado ',
         \ })
 
-  call termopen(l:cmd, {'on_exit': function('documentado#on_exit')})
+  call termopen(l:args)
   setlocal bufhidden=wipe
+  tnoremap <buffer> <C-q> <C-\><C-n>:close<CR>
   startinsert
-endfunction
-
-function! documentado#on_exit(...) abort
-  if s:doc_win > 0 && nvim_win_is_valid(s:doc_win)
-    call nvim_win_close(s:doc_win, v:true)
-  endif
-  let s:doc_win = -1
 endfunction
