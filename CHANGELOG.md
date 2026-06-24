@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.0.3 (unreleased)
+
+### Features
+- Nerd Font icons throughout the UI: panel titles, status bar, indicators, help overlay, discover catalog
+
+### UI
+- Lualine-style status bar: mode colors, icon indicators, contextual keybinding hints
+- Bottom layout compacted to 2 lines (search + status)
+
 ## v0.0.2 (2026-06-23)
 
 ### Features
